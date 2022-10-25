@@ -33,6 +33,7 @@ int main() {
             snd_strerror(rc));
     exit(1);
   }
+  printf("Device open\n");
 
   /* Allocate a hardware parameters object. */
   snd_pcm_hw_params_alloca(&params);
@@ -111,12 +112,22 @@ int main() {
                                     &val, &dir);
   printf("buffer time = %d us\n", val);
 
-  snd_pcm_hw_params_get_buffer_size(params,
-                         (snd_pcm_uframes_t *) &val);
-  printf("buffer size = %d frames\n", val);
+//  snd_pcm_hw_params_get_buffer_size(params,
+//                         (snd_pcm_uframes_t *) &val);
+//  printf("buffer size = %d frames\n", val);
 
-  snd_pcm_hw_params_get_periods(params, &val, &dir);
-  printf("periods per buffer = %d frames\n", val);
+  puts("1");
+
+  val=0;
+  puts("1a");
+  dir=-2;
+  puts("1c");
+  unsigned int periods_got=1;
+  int dirn_got=-2;
+  int ret=snd_pcm_hw_params_get_periods(params, &periods_got, &dirn_got);
+  printf("get_periods returns %d with direction %d\n", ret, dirn_got);
+  puts("1d");
+  printf("periods per buffer = %d frames\n", (int) periods_got);
 
   snd_pcm_hw_params_get_rate_numden(params,
                                     &val, &val2);
@@ -125,6 +136,7 @@ int main() {
   val = snd_pcm_hw_params_get_sbits(params);
   printf("significant bits = %d\n", val);
 
+  fputs("2\n", stderr);
   snd_pcm_hw_params_get_tick_time(params,
                                   &val, &dir);
   printf("tick time = %d us\n", val);
