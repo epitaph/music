@@ -884,7 +884,7 @@ int main(int argc, char *argv[])
         return 0;
     }
     
-    if  set_hwparams(handle, hwparams, transfer_methods[method].access)) < 0) {
+    if  (set_hwparams(handle, hwparams, transfer_methods[method].access) < 0) {
         printf("Setting of hwparams failed: %s\n", snd_strerror(err));
         exit(EXIT_FAILURE);
     }
