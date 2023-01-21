@@ -12,7 +12,7 @@
 #include <sys/time.h>
 #include <math.h>
  
-static char *device = "pulse";         /* playback device */
+static char *device = "default";         /* playback device */
 static snd_pcm_format_t format = SND_PCM_FORMAT_S16;    /* sample format */
 static unsigned int rate = 44100;           /* stream rate */
 static unsigned int channels = 1;           /* count of channels */
