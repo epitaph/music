@@ -1,7 +1,19 @@
+// Write a signal to a WAV file.
+//
+// TODO:
+// * Error checking!
+// * Fix bit depth dependency in some locations
+// * Integer lengths need checking
+// * Command line options
+//
+// NOTDOING:
+// * Output for non-files, e. g. pipelines, unless I need it
+
 #include <sys/types.h>
 #include <stdio.h>
 #include <math.h>
 
+// Calculate lengths of arrays
 #define A_LEN(var, ty) (sizeof(var)/sizeof(ty))
 
 // Bet this is in a header somewhere, damned if I can find it...
@@ -26,6 +38,7 @@ struct wav_header {
   int16_t nc;
   int16_t bps;
   int32_t sr;
+  int32_t ds;
   FILE * f;
 };
 
@@ -59,10 +72,10 @@ void wav_write_square(struct wav_header * const wh,
   long double const delta_omega=omega/wh->sr;
   long double omega_pos=0.0L;
   for(int pos=0; pos<wh->sr*length; ++pos) {
-    int sample=omega_pos<PI?32767:-32767;
+    int const sample=omega_pos<PI?32767:-32767;
     for(int i=wh->nc; i; --i)
       wav_write_sample(wh, sample);
-    fprintf(stderr, "%d\n", (int)sample);
+//    fprintf(stderr, "%d\n", (int)sample);
     omega_pos+=delta_omega;
     if(omega_pos>=TAU)
       omega_pos-=TAU;
@@ -92,7 +105,7 @@ void wav_write_initial_header(struct wav_header * const wh,
   fwrite(fmt_hdr, sizeof(char), fmt_hdr_len, f);
   // We have to write the header length in here. Yes, I don't know
   // either; it seems useless at the end ... bytes 16-19
-  tmp.i32=ftell(f);
+  tmp.i32=16;
   fprintf(stderr, "%d\n", (int)tmp.i32);
   fwrite(&tmp.i32, sizeof(int32_t), 1, f);
   // encoding type, pcm. Bytes 20-21
@@ -100,7 +113,7 @@ void wav_write_initial_header(struct wav_header * const wh,
   // No. of channels, bytes 22-23
   fwrite(&wh->nc, sizeof(int16_t), 1, f);
   // Sample rate, bytes 24-27
-  fwrite(&wh->sr, sizeof(int16_t), 1, f);
+  fwrite(&wh->sr, sizeof(int32_t), 1, f);
   // Appears to be bytes per second, bytes 28-31
   tmp.i32=wh->sr*wh->bps*wh->nc/8;
   fwrite(&tmp.i32, sizeof(int32_t), 1, f);
@@ -111,10 +124,21 @@ void wav_write_initial_header(struct wav_header * const wh,
   // Bits per sample. Bytes 34-35
   fwrite(&wh->bps, sizeof(int16_t), 1, f);
   // Data header. Bytes 36-39
-  fwrite(data_hdr, sizeof(char), 1, f);
+  fwrite(data_hdr, sizeof(char), A_LEN(data_hdr, char), f);
   // Placeholder for data size. Bytes 40-43
   wh->wdl=ftell(f);
   fwrite(&dflt_dlen, sizeof(int32_t), 1, f);
+  wh->ds=ftell(f);
+}
+
+void wav_write_header_closure(struct wav_header * const wh) {
+  int32_t tmp_i32=ftell(wh->f)-4;
+  fprintf(stderr, "%d\n", (int)tmp_i32);
+  fseek(wh->f, wh->wfl, SEEK_SET);
+  fwrite(&tmp_i32, sizeof(int32_t), 1, wh->f);
+  fseek(wh->f, wh->wdl, SEEK_SET);
+  tmp_i32=tmp_i32-wh->ds;
+  fwrite(&tmp_i32, sizeof(int32_t), 1, wh->f);
 }
 
 int main(int argc, char * argv[]) {
@@ -124,6 +148,7 @@ int main(int argc, char * argv[]) {
   wav_set_bits_per_sample(&wh, 16);
   wav_write_initial_header(&wh, stdout);
   wav_write_square(&wh, 440.0, 5.0);
+  wav_write_header_closure(&wh);
 
   return 0;
 }
