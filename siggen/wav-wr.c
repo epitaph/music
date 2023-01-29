@@ -11,7 +11,9 @@
 
 #include <sys/types.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <math.h>
+#include <getopt.h>
 
 // Calculate lengths of arrays
 #define A_LEN(var, ty) (sizeof(var)/sizeof(ty))
@@ -30,7 +32,7 @@ size_t const static fmt_hdr_len=A_LEN(fmt_hdr, char);
 int16_t const static pcm_ident=1;
 
 int32_t const static dflt_flen=0x41414141;
-int32_t const static dflt_dlen=0x81818181;
+int32_t const static dflt_dlen=0x61616161;
 
 struct wav_header {
   int32_t wfl;
@@ -41,6 +43,113 @@ struct wav_header {
   int32_t ds;
   FILE * f;
 };
+
+char const static siggen_short_opts[]="+stqwi";
+struct option const static siggen_long_opts [] = {
+  {
+    "sine",
+    no_argument,
+    NULL,
+    's'
+  },
+  {
+    "square",
+    no_argument,
+    NULL,
+    'q'
+  },
+  {
+    "triangle",
+    no_argument,
+    NULL,
+    't'
+  },
+  {
+    "sawtooth",
+    no_argument,
+    NULL,
+    'w'
+  },
+  {
+    "invert",
+    no_argument,
+    NULL,
+    'i'
+  },
+  {
+    NULL,
+    0,
+    NULL,
+    0
+  }
+};
+
+void sg_error(int const sg_errno, char const * sg_errstr) {
+  fprintf(stderr, "%s\n", sg_errstr);
+  exit(sg_errno);
+}
+
+struct options {
+  long double const (* wave_function)(long double const);
+  int invert;
+};
+
+void init_options(struct options * opts) {
+  opts->wave_function=&sinl;
+  opts->invert=0;
+}
+
+long double const wave_square(long double const omega) {
+  return 0.0L;
+}
+
+long double const wave_sawtooth(long double const omega) {
+  return 0.0L;
+}
+
+long double const wave_triangle(long double const omega) {
+  return 0.0L;
+}
+
+int parse_options(struct options * sg_opts, int argc, char * argv[]) {
+  int opt;
+
+  while(
+      (opt=getopt_long(
+        argc,
+        argv,
+        siggen_short_opts,
+        siggen_long_opts,
+        NULL
+        )
+      )!=-1) {
+    switch(opt) {
+      case 'i':
+        sg_opts->invert=!sg_opts->invert;
+      break;
+
+      case 's':
+        sg_opts->wave_function=&sinl;
+      break;
+
+      case 'q':
+        sg_opts->wave_function=&wave_square;
+      break;
+
+      case 'w':
+        sg_opts->wave_function=&wave_sawtooth;
+      break;
+
+      case 't':
+        sg_opts->wave_function=&wave_triangle;
+      break;
+
+      default:
+        sg_error(1, "Unknown option");
+      break;
+    }
+  }
+}
 
 void wav_set_n_channels(struct wav_header * const wh,
                         int16_t const n_channels) {
@@ -143,6 +252,9 @@ void wav_write_header_closure(struct wav_header * const wh) {
 
 int main(int argc, char * argv[]) {
   struct wav_header wh;
+  struct options sgo;
+  init_options(&sgo);
+  parse_options(&sgo, argc, argv);
   wav_set_sample_rate(&wh, 48000);
   wav_set_n_channels(&wh, 2);
   wav_set_bits_per_sample(&wh, 16);
