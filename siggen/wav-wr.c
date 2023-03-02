@@ -21,7 +21,8 @@
 // Bet this is in a header somewhere, damned if I can find it...
 #define PI (3.14159265358979323846L)
 #define TAU (2.0L*PI)
-#define RANDOM_RANGE (2.0L*1024.0L*1024.0L*1024.0L)
+#define RANDOM_RANGE (1024.0L*1024.0L*1024.0L)
+#define RANDOM_OFFSET (1024.0L*1024.0L*1024.0L)
 
 char const static riff_hdr[4]="RIFF";
 size_t const static riff_hdr_len=A_LEN(riff_hdr, char);
@@ -139,7 +140,7 @@ long double const wave_triangle(long double const omega) {
 }
 
 long double wave_noise(long double const omega) {
-  return ((long double) random())/RANDOM_RANGE;
+  return (((long double) random())-RANDOM_OFFSET)/RANDOM_RANGE;
 }
 
 int parse_options(struct options * sg_opts, int argc, char * argv[]) {
@@ -228,7 +229,8 @@ void wav_write_wave(struct wav_header const * const wh,
   long double omega_pos=0.0L;
   for(int pos=0; pos<wh->sr*length; ++pos) {
 //    fprintf(stderr, "omega %f\n", (double) omega_pos);
-    int32_t sample=sgo->wave_function(omega_pos)*sgo->volume*sgo->invert*32767+0.5L;
+    int32_t sample=sgo->wave_function(omega_pos)*
+                   sgo->volume*sgo->invert*32767+0.5L;
     sample=sample>32767 ? 32767 : (sample < -32767 ? -32767 : sample);
     for(int i=wh->nc; i; --i)
       wav_write_sample(wh, (int16_t) sample);
