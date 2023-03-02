@@ -21,6 +21,7 @@
 // Bet this is in a header somewhere, damned if I can find it...
 #define PI (3.14159265358979323846L)
 #define TAU (2.0L*PI)
+#define RANDOM_RANGE (2.0L*1024.0L*1024.0L*1024.0L)
 
 char const static riff_hdr[4]="RIFF";
 size_t const static riff_hdr_len=A_LEN(riff_hdr, char);
@@ -44,7 +45,7 @@ struct wav_header {
   FILE * f;
 };
 
-char const static siggen_short_opts[]="+stqwi";
+char const static siggen_short_opts[]="+stqwniv:b:c:";
 struct option const static siggen_long_opts [] = {
   {
     "sine",
@@ -71,10 +72,34 @@ struct option const static siggen_long_opts [] = {
     'w'
   },
   {
+    "noise",
+    no_argument,
+    NULL,
+    'n'
+  },
+  {
     "invert",
     no_argument,
     NULL,
     'i'
+  },
+  {
+    "volume",
+    required_argument,
+    NULL,
+    'v'
+  },
+  {
+    "bitdepth",
+    required_argument,
+    NULL,
+    'b'
+  },
+  {
+    "channels",
+    required_argument,
+    NULL,
+    'c'
   },
   {
     NULL,
@@ -91,24 +116,30 @@ void sg_error(int const sg_errno, char const * sg_errstr) {
 
 struct options {
   long double const (* wave_function)(long double const);
-  int invert;
+  int invert; // 1 - false; -1 - true
+  long double volume;
 };
 
 void init_options(struct options * opts) {
   opts->wave_function=&sinl;
-  opts->invert=0;
+  opts->invert=1;
+  opts->volume=1.0L;
 }
 
 long double const wave_square(long double const omega) {
-  return 0.0L;
+  return omega<PI ? 1.0L : -1.0L;
 }
 
 long double const wave_sawtooth(long double const omega) {
-  return 0.0L;
+  return omega/PI-1,0L;
 }
 
 long double const wave_triangle(long double const omega) {
-  return 0.0L;
+  return (omega<PI ? 2.0L*omega/PI : 2.0*(TAU-omega)/PI)-1.0L;
+}
+
+long double wave_noise(long double const omega) {
+  return ((long double) random())/RANDOM_RANGE;
 }
 
 int parse_options(struct options * sg_opts, int argc, char * argv[]) {
@@ -125,7 +156,7 @@ int parse_options(struct options * sg_opts, int argc, char * argv[]) {
       )!=-1) {
     switch(opt) {
       case 'i':
-        sg_opts->invert=!sg_opts->invert;
+        sg_opts->invert=-sg_opts->invert;
       break;
 
       case 's':
@@ -142,6 +173,19 @@ int parse_options(struct options * sg_opts, int argc, char * argv[]) {
 
       case 't':
         sg_opts->wave_function=&wave_triangle;
+      break;
+
+      case 'n':
+        sg_opts->wave_function=&wave_noise;
+      break;
+
+      case 'v':
+        char * t;
+        long double v=strtold(optarg, &t);
+        if(*t)
+          sg_error(2, "could not parse arg to -v");
+        v=v<0.0L ? 0.0L : (v>1.0L ? 1.0L : v);
+        sg_opts->volume=v;
       break;
 
       default:
@@ -169,21 +213,25 @@ void wav_set_bits_per_sample(struct wav_header * const wh,
 // This section is a bit dependent on the bit depth being 16, and should
 // be fixed at some point
 
-void wav_write_sample(struct wav_header * const wh,
+void wav_write_sample(struct wav_header const * const wh,
                       int16_t const sample) {
   fwrite(&sample, sizeof(int16_t), 1, wh->f);
 }
 
-void wav_write_square(struct wav_header * const wh,
+void wav_write_wave(struct wav_header const * const wh,
+                      struct options const * const sgo,
                       long double const frequency,
                       long double const length) {
   long double const omega=TAU*frequency; 
   long double const delta_omega=omega/wh->sr;
+//  fprintf(stderr, "do %f\n", (double) delta_omega);
   long double omega_pos=0.0L;
   for(int pos=0; pos<wh->sr*length; ++pos) {
-    int const sample=omega_pos<PI?32767:-32767;
+//    fprintf(stderr, "omega %f\n", (double) omega_pos);
+    int32_t sample=sgo->wave_function(omega_pos)*sgo->volume*sgo->invert*32767+0.5L;
+    sample=sample>32767 ? 32767 : (sample < -32767 ? -32767 : sample);
     for(int i=wh->nc; i; --i)
-      wav_write_sample(wh, sample);
+      wav_write_sample(wh, (int16_t) sample);
 //    fprintf(stderr, "%d\n", (int)sample);
     omega_pos+=delta_omega;
     if(omega_pos>=TAU)
@@ -259,7 +307,7 @@ int main(int argc, char * argv[]) {
   wav_set_n_channels(&wh, 2);
   wav_set_bits_per_sample(&wh, 16);
   wav_write_initial_header(&wh, stdout);
-  wav_write_square(&wh, 440.0, 5.0);
+  wav_write_wave(&wh, &sgo, 440.0, 5.0);
   wav_write_header_closure(&wh);
 
   return 0;
