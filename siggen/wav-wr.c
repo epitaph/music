@@ -156,6 +156,7 @@ int parse_options(struct options * sg_opts, int argc, char * argv[]) {
         )
       )!=-1) {
     switch(opt) {
+      char * t;
       case 'i':
         sg_opts->invert=-sg_opts->invert;
       break;
@@ -181,12 +182,14 @@ int parse_options(struct options * sg_opts, int argc, char * argv[]) {
       break;
 
       case 'v':
-        char * t;
         long double v=strtold(optarg, &t);
         if(*t)
           sg_error(2, "could not parse arg to -v");
         v=v<0.0L ? 0.0L : (v>1.0L ? 1.0L : v);
         sg_opts->volume=v;
+      break;
+
+      case 'b':
       break;
 
       default:
